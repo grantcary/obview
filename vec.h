@@ -7,6 +7,7 @@ typedef struct Vec3I {
 } Vec3I;
 
 typedef struct OBJ {
+    char* name;
     int vertices_size;
     Vec3* vertices;
     int faces_size;
