@@ -1,17 +1,14 @@
+#ifndef VEC_H
+#define VEC_H
+
 typedef struct Vec3 {
     float x, y, z;
 } Vec3;
 
 typedef struct Vec3I {
-    int x, y, z;
+    int* vec;
 } Vec3I;
 
-typedef struct OBJ {
-    char* name;
-    int vertices_size;
-    Vec3* vertices;
-    int normals_size;
-    Vec3* normals;
-    int faces_size;
-    Vec3I* faces;
-} OBJ;
+#define add(a, b) {a.x + b.x, a.y + b.y, a.z + b.z}
+
+#endif

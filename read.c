@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "object.h"
 #include "vec.h"
 
 // Vec3* float_parse(FILE* raw_obj, char* line) {
@@ -82,7 +83,6 @@ OBJ* read_obj(char* filename) {
         // skips white space
         i++;
         
-        // j retains index in line after keyword characters + space
         if (strcmp(keyword, "o") == 0) {
             if (new_object->name != NULL) {
                 free(new_object->name);
@@ -131,6 +131,9 @@ int main() {
     printf("%s", o->name);
     printv(o->vertices, o->vertices_size);
     printv(o->normals, o->normals_size);
+
+    Vec3 n = (Vec3) add(o->normals[0], o->vertices[0]);
+    printf("%f, %f, %f\n", n.x, n.y, n.z);
 
     // Vec3 a = {0.0, 0.1, 0.2};
 
