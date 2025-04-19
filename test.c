@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "vec.h"
 
-void assign(OBJ* o) {
+void assign(Group* o) {
     Vec3 b = {4.0, 5.0, 6.0};
 
     Vec3* x = (Vec3*) malloc(2 * sizeof(Vec3));

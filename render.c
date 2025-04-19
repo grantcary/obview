@@ -13,10 +13,12 @@ int main() {
         return 0;
     }
 
+    Group** gp = o->groups;
+
     printf("%s", o->name);
     printv(o->vertices, o->vertices_size);
-    printv(o->normals, o->normals_size);
-    printvi(o->faces, o->vertex_per_face, o->faces_size);
+    printv(gp[0]->normals, gp[0]->normals_size);
+    printvi(gp[0]->faces, gp[0]->vertices_per_face, gp[0]->faces_size);
 
     // Vec3 n = (Vec3) add(o->normals[0], o->vertices[0]);
     // printf("%f, %f, %f\n", n.x, n.y, n.z);

@@ -3,15 +3,23 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 
-typedef struct OBJ {
+typedef struct Group {
     char* name;
-    int vertices_size;
-    Vec3* vertices;
     int normals_size;
     Vec3* normals;
     int faces_size;
     Vec3I* faces;
-    int* vertex_per_face;
+    int* vertices_per_face;
+} Group;
+
+typedef struct OBJ {
+    char* name;
+    
+    int vertices_size;
+    Vec3* vertices;
+    
+    int groups_size;
+    Group** groups;
 } OBJ;
 
 OBJ* read_obj(char*);

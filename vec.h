@@ -2,7 +2,7 @@
 #define VEC_H
 
 typedef struct Vec3 {
-    float x, y, z;
+    float x, y, z, w;
 } Vec3;
 
 typedef struct Vec3I {

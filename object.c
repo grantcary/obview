@@ -4,30 +4,62 @@
 #include "object.h"
 #include "vec.h"
 
-void obj_init(OBJ* new_object, int size) {
-    new_object->vertices_size = size;
-    new_object->vertices = (Vec3*) calloc(size, sizeof(Vec3));
-    new_object->normals_size = size;
-    new_object->normals = (Vec3*) calloc(size, sizeof(Vec3));
-    new_object->faces_size = size;
-    new_object->faces = (Vec3I*) calloc(size, sizeof(Vec3I));
-    new_object->vertex_per_face = (int*) calloc(size, sizeof(int));
+#define max(a, b) a > b ? a : b
+
+Group* group_init(int size) {
+    Group* group = (Group*) malloc(sizeof(Group));
+
+    group->normals_size = size;
+    group->normals = (Vec3*) malloc(size * sizeof(Vec3));
+    
+    group->faces_size = size;
+    group->faces = (Vec3I*) malloc(size * sizeof(Vec3I));
+    group->vertices_per_face = (int*) malloc(size * sizeof(int));
+    
+    return group;
 }
 
-void consolidate(OBJ* new_object, int v, int vn, int f) {
-    new_object->vertices_size = v;
-    new_object->vertices = (Vec3*) realloc(new_object->vertices, v * sizeof(Vec3));
-    new_object->normals_size = vn;
-    new_object->normals = (Vec3*) realloc(new_object->normals, vn * sizeof(Vec3));
-    new_object->faces_size = f;
-    new_object->vertex_per_face = (int*) realloc(new_object->vertex_per_face, f * sizeof(int));
-    new_object->faces = (Vec3I*) realloc(new_object->faces, f * sizeof(Vec3I));
-    for (int i = 0; i < new_object->faces_size; i++) {
-        new_object->faces[i].vec = (int*) realloc(new_object->faces[i].vec, new_object->vertex_per_face[i] * sizeof(int));
-    }   
+OBJ* obj_init(int size) {
+    OBJ* object = (OBJ*) malloc(sizeof(OBJ));
+    
+    object->vertices_size = size;
+    object->vertices = (Vec3*) malloc(size * sizeof(Vec3));
+
+    object->groups_size = max(10, (int) (size / 10));
+    object->groups = (Group**) malloc(object->groups_size * sizeof(Group));
+
+    return object;
 }
 
-int string_to_Vec3(Vec3* arr, int* arr_size, int p, char* line, int i) {
+Group* group_add(OBJ* object, Group* group, int group_index, int size) {
+    if (group_index > object->groups_size) {
+        object->groups_size *= 2;
+        object->groups = (Group**) realloc(object->groups, object->groups_size * sizeof(Group));
+    }
+    object->groups[group_index] = group;
+
+    return group_init(size);
+}
+
+void consolidate(OBJ* object, int g, int v, int vn, int f) {
+    object->vertices_size = v;
+    object->vertices = (Vec3*) realloc(object->vertices, v * sizeof(Vec3));
+
+    // consolidate groups
+    for (int i = 0; i < g + 1; i++) {
+        object->groups[i]->normals_size = vn;
+        object->groups[i]->normals = (Vec3*) realloc(object->groups[i]->normals, vn * sizeof(Vec3));
+        
+        object->groups[i]->faces_size = f;
+        object->groups[i]->vertices_per_face = (int*) realloc(object->groups[i]->vertices_per_face, f * sizeof(int));
+        object->groups[i]->faces = (Vec3I*) realloc(object->groups[i]->faces, f * sizeof(Vec3I));
+        for (int j = 0; j < object->groups[i]->faces_size; j++) {
+            object->groups[i]->faces[j].vec = (int*) realloc(object->groups[i]->faces[j].vec, object->groups[i]->vertices_per_face[j] * sizeof(int));
+        }   
+    }
+}
+
+void string_to_Vec3(Vec3* arr, int* arr_size, int *p, char* line, int i) {
     int j = 0, k = 0;
     char num[64];
     for (; line[i] != '\0' && j < 64; i++) {
@@ -35,27 +67,27 @@ int string_to_Vec3(Vec3* arr, int* arr_size, int p, char* line, int i) {
             num[j++] = line[i];
         }
         if ((line[i] == ' ' || line[i] == '\n' || line[i] == '\r' || line[i+1] == '\0') && j > 0) {
-            if (p > *arr_size) {
+            if (*p > *arr_size) {
                 *arr_size *= 2;
                 arr = (Vec3*) realloc(arr, *arr_size * sizeof(Vec3));
             }
 
             num[j] = '\0';
             switch (k) {
-                case 0: arr[p].x = atof(num);
-                case 1: arr[p].y = atof(num);
-                case 2: arr[p].z = atof(num);
+                case 0: arr[*p].x = atof(num);
+                case 1: arr[*p].y = atof(num);
+                case 2: arr[*p].z = atof(num);
             }
             memset(num, 0, sizeof(num));
             j = 0;
             k++;
         }
     }
-    return ++p;
+    ++(*p);
 }
 
-int string_to_Vec3I(Vec3I* arr, int* arr2, int* arr_size, int p, char* line, int i) {
-    arr[p].vec = (int*) calloc(3, sizeof(int));
+void string_to_Vec3I(Vec3I* arr, int* arr2, int* arr_size, int* p, char* line, int i) {
+    arr[*p].vec = (int*) calloc(3, sizeof(int));
     int j = 0, k = 0;
     char num[64];
     int slash_encountered = 0;
@@ -72,24 +104,23 @@ int string_to_Vec3I(Vec3I* arr, int* arr2, int* arr_size, int p, char* line, int
         }
         // get only first integer from group
         if (slash_encountered == 1 && j > 0) {
-            if (p > *arr_size) {
+            if (*p > *arr_size) {
                 *arr_size *= 2;
                 arr = (Vec3I*) realloc(arr, *arr_size * sizeof(Vec3I));
                 arr2 = (int*) realloc(arr2, *arr_size * sizeof(int));
-            } else if (k > arr2[p]){
-                arr[p].vec = (int*) realloc(arr[p].vec, arr2[p] * 2 * sizeof(int));
+            } else if (k > arr2[*p]){
+                arr[*p].vec = (int*) realloc(arr[*p].vec, arr2[*p] * 2 * sizeof(int));
             }
 
             num[j] = '\0';
-            arr[p].vec[k] = atoi(num);
-            arr2[p]++;
+            arr[*p].vec[k] = atoi(num);
+            arr2[*p]++;
             memset(num, 0, sizeof(num));
             j = 0;
             k++;
         }
     }
-
-    return ++p;
+    ++(*p);
 }
 
 OBJ* read_obj(char* filename) {
@@ -100,13 +131,17 @@ OBJ* read_obj(char* filename) {
         return NULL;
     }
 
-    OBJ* new_object = (OBJ*) malloc(sizeof(OBJ));
-    obj_init(new_object, 100);
+    int size = 100;
 
+    OBJ* object = obj_init(size);
+    
+    Group* group = group_init(size);
+    int group_index = 0;
+    
     int v = 0, vn = 0, f = 0;
-
+    
     char line[256];
-
+    
     while (fgets(line, sizeof(line), raw_obj)) {
         // grabs keyword pattern from line
         int pattern_limit = 6;
@@ -119,28 +154,32 @@ OBJ* read_obj(char* filename) {
         i++;
         
         if (strcmp(keyword, "o") == 0) {
-            if (new_object->name == NULL) {
+            if (object->name == NULL) {
                 int j = i;
-                new_object->name = (char*) malloc((strlen(line) - i) * sizeof(char));
+                object->name = (char*) malloc((strlen(line) - i) * sizeof(char));
                 for (; i < strlen(line); i++) {
-                    new_object->name[i - j] = line[i];
+                    object->name[i - j] = line[i];
                 }
-                new_object->name[i - j] = '\0';
+                object->name[i - j] = '\0';
             }
         }
         else if (strcmp(keyword, "v") == 0) {
-            v = string_to_Vec3(new_object->vertices, &new_object->vertices_size, v, line, i);
+            string_to_Vec3(object->vertices, &object->vertices_size, &v, line, i);
         }
         else if (strcmp(keyword, "vn") == 0) {
-            vn = string_to_Vec3(new_object->normals, &new_object->normals_size, vn, line, i);
+            string_to_Vec3(group->normals, &group->normals_size, &vn, line, i);
         }
         else if (strcmp(keyword, "f") == 0) {
-            f = string_to_Vec3I(new_object->faces, new_object->vertex_per_face, &new_object->faces_size, f, line, i);
+            string_to_Vec3I(group->faces, group->vertices_per_face, &group->faces_size, &f, line, i);
         }
     }
-    consolidate(new_object, v, vn, f);
 
-    return new_object;
+    group_add(object, group, group_index, size);
+
+    consolidate(object, group_index, v, vn, f);
+
+
+    return object;
 }
 
 void printv(Vec3* arr, int arr_size) {
