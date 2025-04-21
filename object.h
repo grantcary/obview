@@ -1,14 +1,32 @@
-#include "vec.h"
-
 #ifndef OBJECT_H
 #define OBJECT_H
 
+typedef struct Vertex {
+    float x, y, z, w;
+} Vertex;
+
+typedef struct Vertex_Normal {
+    float i, j, k;
+} Vertex_Normal;
+
+typedef struct Vertex_Texture {
+    float u, v, w;
+} Vertex_Texture;
+
+typedef struct Face {
+    int* vertices;
+    int* vertex_texture;
+    int* vertex_normals;
+} Face;
+
 typedef struct Group {
-    char* name;
+    char** name;
+
     int normals_size;
-    Vec3* normals;
+    Vertex_Normal* normals;
+
     int faces_size;
-    Vec3I* faces;
+    Face* faces;
     int* vertices_per_face;
 } Group;
 
@@ -16,7 +34,7 @@ typedef struct OBJ {
     char* name;
     
     int vertices_size;
-    Vec3* vertices;
+    Vertex* vertices;
     
     int groups_size;
     Group** groups;
@@ -24,8 +42,10 @@ typedef struct OBJ {
 
 OBJ* read_obj(char*);
 
-void printv(Vec3*, int);
+void printvertex(Vertex*, int);
 
-void printvi(Vec3I*, int*, int);
+void printvertexnormals(Vertex_Normal*, int);
+
+void printface(Face*, int*, int);
 
 #endif
