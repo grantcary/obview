@@ -22,9 +22,6 @@ typedef struct Face {
 typedef struct Group {
     char** name;
 
-    int normals_size;
-    Vertex_Normal* normals;
-
     int faces_size;
     Face* faces;
     int* vertices_per_face;
@@ -36,6 +33,9 @@ typedef struct OBJ {
     int vertices_size;
     Vertex* vertices;
     
+    int normals_size;
+    Vertex_Normal* normals;
+
     int groups_size;
     Group** groups;
 } OBJ;

@@ -8,9 +8,6 @@
 Group* group_init(int size) {
     Group* group = (Group*) malloc(sizeof(Group));
 
-    group->normals_size = size;
-    group->normals = (Vertex_Normal*) malloc(size * sizeof(Vertex_Normal));
-    
     group->faces_size = size;
     group->faces = (Face*) malloc(size * sizeof(Face));
     group->vertices_per_face = (int*) malloc(size * sizeof(int));
@@ -23,6 +20,9 @@ OBJ* obj_init(int size) {
     
     object->vertices_size = size;
     object->vertices = (Vertex*) malloc(size * sizeof(Vertex));
+    
+    object->normals_size = size;
+    object->normals = (Vertex_Normal*) malloc(size * sizeof(Vertex_Normal));
 
     object->groups_size = max(10, (int) (size / 10));
     object->groups = (Group**) malloc(object->groups_size * sizeof(Group));
@@ -42,11 +42,11 @@ void consolidate(OBJ* object, int g, int v, int vn, int f) {
     object->vertices_size = v;
     object->vertices = (Vertex*) realloc(object->vertices, v * sizeof(Vertex));
 
+    object->normals_size = vn;
+    object->normals = (Vertex_Normal*) realloc(object->normals, vn * sizeof(Vertex_Normal));
+    
     // consolidate groups
-    for (int i = 0; i < g + 1; i++) {
-        object->groups[i]->normals_size = vn;
-        object->groups[i]->normals = (Vertex_Normal*) realloc(object->groups[i]->normals, vn * sizeof(Vertex_Normal));
-        
+    for (int i = 0; i < g + 1; i++) {    
         object->groups[i]->faces_size = f;
         object->groups[i]->vertices_per_face = (int*) realloc(object->groups[i]->vertices_per_face, f * sizeof(int));
         object->groups[i]->faces = (Face*) realloc(object->groups[i]->faces, f * sizeof(Face));
@@ -56,7 +56,7 @@ void consolidate(OBJ* object, int g, int v, int vn, int f) {
     }
 }
 
-void stov(Vertex* arr, int* arr_size, int *p, char* line, int i) {
+void stov(Vertex* v, int* arr_size, int *p, char* line, int i) {
     int j = 0, k = 0;
     char num[64];
     for (; line[i] != '\0' && j < 64; i++) {
@@ -66,15 +66,15 @@ void stov(Vertex* arr, int* arr_size, int *p, char* line, int i) {
         if ((line[i] == ' ' || line[i] == '\n' || line[i] == '\r' || line[i+1] == '\0') && j > 0) {
             if (*p > *arr_size) {
                 *arr_size *= 2;
-                arr = (Vertex*) realloc(arr, *arr_size * sizeof(Vertex));
+                v = (Vertex*) realloc(v, *arr_size * sizeof(Vertex));
             }
 
             num[j] = '\0';
             switch (k) {
-                case 0: arr[*p].x = atof(num);
-                case 1: arr[*p].y = atof(num);
-                case 2: arr[*p].z = atof(num);
-                case 3: arr[*p].w = atof(num);
+                case 0: v[*p].x = atof(num);
+                case 1: v[*p].y = atof(num);
+                case 2: v[*p].z = atof(num);
+                case 3: v[*p].w = atof(num);
             }
             memset(num, 0, sizeof(num));
             j = 0;
@@ -82,8 +82,8 @@ void stov(Vertex* arr, int* arr_size, int *p, char* line, int i) {
         }
     }
     
-    if (k != 3) {
-        arr[*p].w = 1.0;
+    if (k != 4) {
+        v[*p].w = 1.0;
     }
 
     ++(*p);
@@ -168,6 +168,7 @@ OBJ* read_obj(char* filename) {
     
     Group* group = group_init(size);
     int group_index = 0;
+    int g_encounter = 0;
     
     int v = 0, vn = 0, f = 0;
     
@@ -194,11 +195,19 @@ OBJ* read_obj(char* filename) {
                 object->name[i - j] = '\0';
             }
         }
+        else if (strcmp(keyword, "g") == 0) {
+            if (g_encounter > 0) {
+                group_add(object, group, group_index);
+                Group* group = group_init(size);
+            }
+            // add names to group struct
+            g_encounter++;
+        }
         else if (strcmp(keyword, "v") == 0) {
             stov(object->vertices, &object->vertices_size, &v, line, i);
         }
         else if (strcmp(keyword, "vn") == 0) {
-            stovn(group->normals, &group->normals_size, &vn, line, i);
+            stovn(object->normals, &object->normals_size, &vn, line, i);
         }
         else if (strcmp(keyword, "f") == 0) {
             stof(group->faces, group->vertices_per_face, &group->faces_size, &f, line, i);
@@ -224,7 +233,6 @@ void printvertexnormals(Vertex_Normal* arr, int arr_size) {
         printf("%d [%f, %f, %f]\n", x, arr[x].i, arr[x].j, arr[x].k);
     }
 }
-
 
 void printface(Face* arr, int* arr2, int arr_size) {
     for (int i = 0; i < arr_size; i++) {
