@@ -14,8 +14,13 @@ typedef struct Vertex_Texture {
 } Vertex_Texture;
 
 typedef struct Face {
+    int vertices_count;
     int* vertices;
+    
+    int vertex_texture_count;
     int* vertex_texture;
+
+    int vertex_normals_count;
     int* vertex_normals;
 } Face;
 
@@ -24,7 +29,6 @@ typedef struct Group {
 
     int faces_size;
     Face* faces;
-    int* vertices_per_face;
 } Group;
 
 typedef struct OBJ {
@@ -46,6 +50,6 @@ void printvertex(Vertex*, int);
 
 void printvertexnormals(Vertex_Normal*, int);
 
-void printface(Face*, int*, int);
+void printface(Face*, int);
 
 #endif
