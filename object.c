@@ -3,58 +3,69 @@
 #include <string.h>
 #include "object.h"
 
-#define max(a, b) a > b ? a : b
+#define max(a, b) ((a) > (b) ? (a) : (b))
+
+
+OBJ* obj_init(int size) {
+    OBJ* object = malloc(sizeof(OBJ));
+    
+    object->vertices_size = size;
+    object->vertices = malloc(size * sizeof(Vertex));
+    
+    object->normals_size = size;
+    object->normals = malloc(size * sizeof(Vertex_Normal));
+    
+    object->groups_size = (int) max(10, (int) (size / 10));
+    object->groups = malloc(object->groups_size * sizeof(Group*));
+    
+    return object;
+}
 
 Group* group_init(int size) {
-    Group* group = (Group*) malloc(sizeof(Group));
+    Group* group = malloc(sizeof(Group));
 
     group->faces_size = size;
-    group->faces = (Face*) calloc(size, sizeof(Face));
+    group->faces = malloc(size * sizeof(Face));
+
+    for (int i = 0; i < size; i++) {
+        group->faces[i].vertices_count = 3;
+        group->faces[i].vertices = calloc(3, sizeof(int));
+        group->faces[i].vertex_texture_count = 3;
+        group->faces[i].vertex_texture = calloc(3, sizeof(int));
+        group->faces[i].vertex_normals_count = 3;
+        group->faces[i].vertex_normals = calloc(3, sizeof(int));
+    }
     
     return group;
 }
 
-OBJ* obj_init(int size) {
-    OBJ* object = (OBJ*) malloc(sizeof(OBJ));
-    
-    object->vertices_size = size;
-    object->vertices = (Vertex*) malloc(size * sizeof(Vertex));
-    
-    object->normals_size = size;
-    object->normals = (Vertex_Normal*) malloc(size * sizeof(Vertex_Normal));
-
-    object->groups_size = max(10, (int) (size / 10));
-    object->groups = (Group**) malloc(object->groups_size * sizeof(Group));
-
-    return object;
+void consolidate_group(Group* g, int f) {
+    g->faces_size = f;
+    g->faces = realloc(g->faces, f * sizeof(Face));
+    for (int j = 0; j < g->faces_size; j++) {
+        g->faces[j].vertices = realloc(g->faces[j].vertices, g->faces[j].vertices_count * sizeof(int));
+        g->faces[j].vertex_texture = realloc(g->faces[j].vertex_texture, g->faces[j].vertex_texture_count * sizeof(int));
+        g->faces[j].vertex_normals = realloc(g->faces[j].vertex_normals, g->faces[j].vertex_normals_count * sizeof(int));
+    }   
 }
 
-void group_add(OBJ* object, Group* group, int group_index) {
-    if (group_index > object->groups_size) {
+void group_add(OBJ* object, Group* group, int group_index, int f) {
+    consolidate_group(group, f);
+    if (group_index >= object->groups_size) {
         object->groups_size *= 2;
-        object->groups = (Group**) realloc(object->groups, object->groups_size * sizeof(Group));
+        object->groups = realloc(object->groups, object->groups_size * sizeof(Group*));
     }
     object->groups[group_index] = group;
 }
 
-void consolidate(OBJ* object, int g, int v, int vn, int f) {
+void consolidate(OBJ* object, int g, int v, int vn) {
     object->vertices_size = v;
-    object->vertices = (Vertex*) realloc(object->vertices, v * sizeof(Vertex));
+    object->vertices = realloc(object->vertices, v * sizeof(Vertex));
 
     object->normals_size = vn;
-    object->normals = (Vertex_Normal*) realloc(object->normals, vn * sizeof(Vertex_Normal));
+    object->normals = realloc(object->normals, vn * sizeof(Vertex_Normal));
     
-    // consolidate groups
-    for (int i = 0; i < g + 1; i++) {    
-        object->groups[i]->faces_size = f;
-        object->groups[i]->faces = (Face*) realloc(object->groups[i]->faces, f * sizeof(Face));
-        Face* gfp = object->groups[i]->faces;
-        for (int j = 0; j < object->groups[i]->faces_size; j++) {
-            gfp[j].vertices = (int*) realloc(gfp[j].vertices, gfp[j].vertices_count * sizeof(int));
-            gfp[j].vertex_texture = (int*) realloc(gfp[j].vertex_texture, gfp[j].vertex_texture_count * sizeof(int));
-            gfp[j].vertex_normals = (int*) realloc(gfp[j].vertex_normals, gfp[j].vertex_normals_count * sizeof(int));
-        }   
-    }
+    object->groups_size = g + 1;
 }
 
 void stov(Vertex* v, char* line, int i) {
@@ -67,10 +78,10 @@ void stov(Vertex* v, char* line, int i) {
         if ((line[i] == ' ' || line[i] == '\n' || line[i] == '\r' || line[i+1] == '\0') && j > 0) {
             num[j] = '\0';
             switch (k) {
-                case 0: v->x = atof(num);
-                case 1: v->y = atof(num);
-                case 2: v->z = atof(num);
-                case 3: v->w = atof(num);
+                case 0: v->x = atof(num); break;
+                case 1: v->y = atof(num); break;
+                case 2: v->z = atof(num); break;
+                case 3: v->w = atof(num); break;
             }
             memset(num, 0, sizeof(num));
             j = 0;
@@ -105,13 +116,6 @@ void stovn(Vertex_Normal* vn, char* line, int x) {
 }
 
 void stof(Face* face, char* line, int i) {
-    face->vertices_count = 3;
-    face->vertices = (int*) calloc(3, sizeof(int));
-    face->vertex_texture_count = 3;
-    face->vertex_texture = (int*) calloc(3, sizeof(int));
-    face->vertex_normals_count = 3;
-    face->vertex_normals = (int*) calloc(3, sizeof(int));
-    
     int j = 0, k = 0, l = 0, m = 0;
     char num[64];
     int last = 0;
@@ -129,42 +133,43 @@ void stof(Face* face, char* line, int i) {
 
         if (last == 0 && (line[i + 1] == ' ' || line[i + 1] == '/' || line[i + 1] == '\n' || line[i + 1] == '\r' || line[i + 1] == '\0') && j > 0) {
             if (k > face->vertices_count){
-                face->vertices = (int*) realloc(face->vertices, face->vertices_count * 2 * sizeof(int));
+                face->vertices_count *= 2;
+                face->vertices = realloc(face->vertices, face->vertices_count * sizeof(int));
             }
             
             num[j] = '\0';
             face->vertices[k] = atoi(num);
-            face->vertices_count++;
             memset(num, 0, sizeof(num));
             j = 0;
             k++;
         }
         else if (last == 1 && line[i + 1] == '/' && j > 0) {
             if (l > face->vertex_texture_count){
-                face->vertex_texture = (int*) realloc(face->vertex_texture, face->vertex_texture_count * 2 * sizeof(int));
+                face->vertex_texture_count *= 2;
+                face->vertex_texture = realloc(face->vertex_texture, face->vertex_texture_count * sizeof(int));
             }
 
             num[j] = '\0';
             face->vertex_texture[l] = atoi(num);
-            face->vertex_texture_count++;
             memset(num, 0, sizeof(num));
             j = 0;
             l++;
         }
         else if (last == 2 && (line[i + 1] == ' ' || line[i + 1] == '\n' || line[i + 1] == '\r' || line[i + 1] == '\0') && j > 0) {
             if (l > face->vertex_normals_count){
-                face->vertex_normals = (int*) realloc(face->vertex_normals, face->vertex_normals_count * 2 * sizeof(int));
+                face->vertex_normals_count *= 2;
+                face->vertex_normals = realloc(face->vertex_normals, face->vertex_normals_count * sizeof(int));
             }
 
             num[j] = '\0';
             face->vertex_normals[m] = atoi(num);
-            face->vertex_normals_count++;
             memset(num, 0, sizeof(num));
             j = 0;
             m++;
         }
+        // printf("%d %d %d\n", k, l, m);
     }
-
+    
     face->vertices_count = k;
     face->vertices = (int*) realloc(face->vertices, k * sizeof(int));
     face->vertex_texture_count = l;
@@ -187,8 +192,7 @@ OBJ* read_obj(char* filename) {
     
     Group* group = group_init(size);
     int group_index = 0;
-    int g_encounter = 0;
-    
+
     int v = 0, vt = 0, vn = 0, f = 0;
     
     char line[256];
@@ -201,6 +205,7 @@ OBJ* read_obj(char* filename) {
         for (; line[i] != ' ' && i < pattern_limit; i++) {
             keyword[i] = line[i];
         }
+        keyword[i] = '\0';
         // skips white space
         i++;
         
@@ -215,45 +220,45 @@ OBJ* read_obj(char* filename) {
             }
         }
         else if (strcmp(keyword, "g") == 0) {
-            if (g_encounter > 0) {
-                group_add(object, group, group_index);
-                Group* group = group_init(size);
-            }
-            // add names to group struct
-            g_encounter++;
+            group_add(object, group, group_index, f);
+            f = 0;
+            group_index++;
+            group = group_init(size);
         }
         else if (strcmp(keyword, "v") == 0) {
-            if (v > object->vertices_size) {
-                object->vertices_size *= 2;
-                object->vertices = (Vertex*) realloc(object->vertices, object->vertices_size * sizeof(Vertex));
+            if (v >= object->vertices_size) {
+                object->vertices_size = v * 2;
+                object->vertices = realloc(object->vertices, object->vertices_size * sizeof(Vertex));
             }
-
+            
             stov(&object->vertices[v], line, i);
             v++;
         }
         else if (strcmp(keyword, "vn") == 0) {
-            if (vn > object->normals_size) {
-                object->normals_size *= 2;
-                object->normals = (Vertex_Normal*) realloc(object->normals, object->normals_size * sizeof(Vertex_Normal));
+            if (vn >= object->normals_size) {
+                object->normals_size = vn * 2;
+                object->normals = realloc(object->normals, object->normals_size * sizeof(Vertex_Normal));
             }
-
+            
             stovn(&object->normals[vn], line, i);
             vn++;
         }
         else if (strcmp(keyword, "f") == 0) {
-            if (f > group->faces_size) {
-                group->faces_size *= 2;
-                group->faces = (Face*) realloc(group->faces, group->faces_size * sizeof(Face));
+            if (f >= group->faces_size) {
+                group->faces_size = f * 2;
+                group->faces = realloc(group->faces, group->faces_size * sizeof(Face));
             }
-
+        
             stof(&group->faces[f], line, i);
             f++;
         }
+        
+        free(keyword);
     }
+    group_add(object, group, group_index, f);
+    f = 0;
 
-    group_add(object, group, group_index);
-
-    consolidate(object, group_index, v, vn, f);
+    consolidate(object, group_index, v, vn);
 
 
     return object;
@@ -277,19 +282,13 @@ void printface(Face* arr, int arr_size) {
             printf("%d ", arr[i].vertices[j]);
         }
         printf("\n");
-    }
-
-    for (int i = 0; i < arr_size; i++) {
         for (int j = 0; j < arr[i].vertex_texture_count; j++) {
             printf("%d ", arr[i].vertex_texture[j]);
         }
         printf("\n");
-    }
-    
-    for (int i = 0; i < arr_size; i++) {
         for (int j = 0; j < arr[i].vertex_normals_count; j++) {
             printf("%d ", arr[i].vertex_normals[j]);
         }
-        printf("\n");
+        printf("\n\n");
     }
 }
